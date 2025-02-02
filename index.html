@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mini-game</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: black;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        .counter {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 200px;
+            user-select: none;
+            pointer-events: none;
+        }
+        #counter {
+            font-family: "Kanit", sans-serif;
+            color: rgba(255, 255, 255, 0.089);
+            z-index: -10;
+            transition: transform 0.3s ease;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="counter">
+        <div id="counter">0</div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const counterElement = document.getElementById('counter');
+
+        let pointerX = -1;
+        let pointerY = -1;
+
+        let nearbyPoints = 0;
+        let previousNearbyPoints = 0;
+
+        const attractionRadius = 60;
+        let points = [];
+
+        function calculatePointsNumber() {
+            const area = window.innerWidth * window.innerHeight;
+            const baseNumber = 200; // Базовое количество точек для экрана 1920x1080
+            const baseArea = 1920 * 1080;
+            return Math.max(50, Math.floor((area / baseArea) * baseNumber));
+        }
+
+        function initializePoints() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const numPoints = calculatePointsNumber();
+            points = [];
+
+            for (let i = 0; i < numPoints; i++) {
+                points.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    dx: (Math.random() - 0.5) * 2,
+                    dy: (Math.random() - 0.5) * 2,
+                    collected: false,
+                    movingRandomly: false,
+                });
+            }
+        }
+
+        function updatePointerPosition(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            pointerX = clientX - rect.left;
+            pointerY = clientY - rect.top;
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            updatePointerPosition(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            updatePointerPosition(touch.clientX, touch.clientY);
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            updatePointerPosition(touch.clientX, touch.clientY);
+        });
+
+        canvas.addEventListener('touchend', () => {
+            pointerX = -1;
+            pointerY = -1;
+        });
+
+        function drawLines() {
+            for (let i = 0; i < points.length; i++) {
+                for (let j = i + 1; j < points.length; j++) {
+                    const p1 = points[i];
+                    const p2 = points[j];
+                    const dist = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+                    if (dist < 150) {
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function drawAttractionArea() {
+            if (pointerX !== -1 && pointerY !== -1) {
+                ctx.beginPath();
+                ctx.arc(pointerX, pointerY, attractionRadius, 0, Math.PI * 2);
+
+                const gradient = ctx.createRadialGradient(pointerX, pointerY, attractionRadius - 10, pointerX, pointerY, attractionRadius + 20);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
+                gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(pointerX, pointerY, attractionRadius - 5, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        function updatePoints() {
+            nearbyPoints = 0;
+
+            for (let i = 0; i < points.length; i++) {
+                const point = points[i];
+
+                if (pointerX !== -1 && pointerY !== -1) {
+                    const distToPointer = Math.sqrt((pointerX - point.x) ** 2 + (pointerY - point.y) ** 2);
+                    if (distToPointer < attractionRadius) {
+                        const angle = Math.atan2(pointerY - point.y, pointerX - point.x);
+                        point.dx = Math.cos(angle) * 0.5;
+                        point.dy = Math.sin(angle) * 0.5;
+
+                        if (!point.collected) {
+                            nearbyPoints++;
+                        }
+
+                        point.movingRandomly = false;
+                    } else {
+                        if (!point.movingRandomly) {
+                            const randomAngle = Math.random() * Math.PI * 2;
+                            point.dx = Math.cos(randomAngle) * 0.5;
+                            point.dy = Math.sin(randomAngle) * 0.5;
+                            point.movingRandomly = true;
+                        }
+                    }
+                }
+
+                point.x += point.dx;
+                point.y += point.dy;
+
+                if (point.x <= 0 || point.x >= canvas.width) point.dx = -point.dx;
+                if (point.y <= 0 || point.y >= canvas.height) point.dy = -point.dy;
+            }
+        }
+
+        function updateCounter() {
+            if (nearbyPoints !== previousNearbyPoints) {
+                counterElement.style.animation = 'pulse 0.3s ease';
+                setTimeout(() => {
+                    counterElement.style.animation = '';
+                }, 300);
+
+                previousNearbyPoints = nearbyPoints;
+            }
+            counterElement.textContent = `${nearbyPoints}`;
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAttractionArea();
+            drawLines();
+            updatePoints();
+            updateCounter();
+
+            for (let i = 0; i < points.length; i++) {
+                const point = points[i];
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = point.collected ? 'gray' : 'white';
+                ctx.fill();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        initializePoints();
+        animate();
+
+        window.addEventListener('resize', () => {
+            initializePoints();
+        });
+    </script>
+</body>
+</html>
+
