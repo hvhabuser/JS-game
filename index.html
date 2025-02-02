@@ -59,7 +59,7 @@
         let nearbyPoints = 0;
         let previousNearbyPoints = 0;
 
-        const attractionRadius = 60;
+        let attractionRadius = 60;
         let points = [];
 
         function calculatePointsNumber() {
@@ -72,6 +72,7 @@
         function initializePoints() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            
             const numPoints = calculatePointsNumber();
             points = [];
 
@@ -115,12 +116,15 @@
         });
 
         function drawLines() {
+            let maxDistance = window.innerWidth < 768 ? 80 : 150; // На мобильных 80px, на ПК 150px
+
             for (let i = 0; i < points.length; i++) {
                 for (let j = i + 1; j < points.length; j++) {
                     const p1 = points[i];
                     const p2 = points[j];
                     const dist = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
-                    if (dist < 150) {
+                    
+                    if (dist < maxDistance) {
                         ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
                         ctx.lineWidth = 0.5;
                         ctx.beginPath();
